@@ -6,6 +6,7 @@ const stream = require('readable-stream')
 const queueMicrotask = require('queue-microtask') // TODO: remove when Node 10 is not supported
 const errCode = require('err-code')
 const { Buffer } = require('buffer')
+const Logger = require('utils/logger')
 
 const MAX_BUFFERED_AMOUNT = 64 * 1024
 const ICECOMPLETE_TIMEOUT = 5 * 1000
@@ -20,6 +21,8 @@ function warn (message) {
   console.warn(message)
 }
 
+const logger = new Logger("simple-peer");
+
 /**
  * WebRTC peer connection. Same API as node core `net.Socket`, plus a few extra methods.
  * Duplex stream.
@@ -27,6 +30,7 @@ function warn (message) {
  */
 class Peer extends stream.Duplex {
   constructor (opts) {
+    logger.addLog("Peer constructor")
     opts = Object.assign({
       allowHalfOpen: false
     }, opts)
@@ -115,6 +119,7 @@ class Peer extends stream.Duplex {
       this._onIceStateChange()
     }
     this._pc.onconnectionstatechange = () => {
+      logger.addLog("onconnectionstatechange")
       this._onConnectionStateChange()
     }
     this._pc.onsignalingstatechange = () => {
@@ -148,6 +153,7 @@ class Peer extends stream.Duplex {
     }
 
     if (this.streams) {
+      logger.addLog("Peer streams count: " + this.streams.length)
       this.streams.forEach(stream => {
         this.addStream(stream)
       })
@@ -190,7 +196,7 @@ class Peer extends stream.Duplex {
       }
     }
     this._debug('signal()')
-
+    logger.addLog("signal()" + JSON.stringify(data))
     if (data.renegotiate && this.initiator) {
       this._debug('got request to renegotiate')
       this._needsNegotiation()
@@ -282,7 +288,7 @@ class Peer extends stream.Duplex {
     if (this.destroying) return
     if (this.destroyed) throw errCode(new Error('cannot addStream after peer is destroyed'), 'ERR_DESTROYED')
     this._debug('addStream()')
-
+    logger.addLog("addStream tracks count: " + e.getTracks().length)
     stream.getTracks().forEach(track => {
       this.addTrack(track, stream)
     })
@@ -617,6 +623,7 @@ class Peer extends stream.Duplex {
           if (this.destroyed) return
           const signal = this._pc.localDescription || offer
           this._debug('signal')
+          logger.addLog("sendOffer()")
           this.emit('signal', {
             type: signal.type,
             sdp: signal.sdp
@@ -671,6 +678,7 @@ class Peer extends stream.Duplex {
             type: signal.type,
             sdp: signal.sdp
           })
+          logger.addLog("createAnswer()")
           if (!this.initiator) this._requestMissingTransceivers()
         }
 
